@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 #******************************************************************************
 # File Name:   udp_server.py
 #
@@ -6,7 +8,7 @@
 # and receives acknowledgement from the client.
 #
 #********************************************************************************
-# Copyright 2020-2022, Cypress Semiconductor Corporation (an Infineon company) or
+# Copyright 2020-2024, Cypress Semiconductor Corporation (an Infineon company) or
 # an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 #
 # This software, including source code, documentation and related
@@ -36,14 +38,10 @@
 # including Cypress's product in a High Risk Product, the manufacturer
 # of such system or application assumes all risk of such use and in doing
 # so agrees to indemnify Cypress against all liability.
-#********************************************************************************
-
-#!/usr/bin/python
+#********************************************************************************/
 
 import socket
 import optparse
-import time
-import sys
 
 DEFAULT_IP   = socket.gethostbyname(socket.gethostname())   # IP address of the UDP server
 DEFAULT_PORT = 50007                                        # Port of the UDP server
@@ -71,7 +69,7 @@ def echo_server(host, port):
     sock.bind((host,port))
     print('UDP Server on IP Address: {} port {}'.format(host, port))
     print('waiting to receive message from UDP Client')
-    
+
     while True:
         data, addr = sock.recvfrom(4096)
         if data == bytes('A', "utf-8"):
@@ -86,7 +84,7 @@ def echo_server(host, port):
         else:
             print("Message from Client: {}".format(data))
             enter_command(sock, addr)
-        
+
 
 if __name__ == '__main__':
     parser = optparse.OptionParser()
@@ -96,3 +94,5 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     echo_server(options.hostname, options.port)
+
+# [] END OF FILE

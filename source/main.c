@@ -9,7 +9,7 @@
 * Related Document: See README.md
 *
 ********************************************************************************
-* Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2022-2024, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -107,7 +107,7 @@ int main(void)
     printf("============================================================\n");
     printf("                 CE235599 - Ethernet:UDP Client             \n");
     printf("============================================================\n\n");
-
+    
     /* Create the tasks. */
     xTaskCreate(udp_client_task, "Network task", UDP_CLIENT_TASK_STACK_SIZE, NULL,
                 UDP_CLIENT_TASK_PRIORITY, &client_task_handle);

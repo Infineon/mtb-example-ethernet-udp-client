@@ -5,7 +5,7 @@
 *              operation.
 *
 ********************************************************************************
-* Copyright 2022, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2022-2024, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -63,6 +63,7 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include "cy_eth_phy_driver.h"
 /*******************************************************************************
 * Macros
 ********************************************************************************/
@@ -89,6 +90,12 @@
 /* RTOS related macros for UDP client task. */
 #define RTOS_TASK_TICKS_TO_WAIT           (1000)
 
+/* Ethernet interface ID */
+#ifdef XMC7100D_F176K4160
+#define INTERFACE_ID                        CY_ECM_INTERFACE_ETH0
+#else
+#define INTERFACE_ID                        CY_ECM_INTERFACE_ETH1
+#endif
 /*******************************************************************************
 * Function Prototypes
 ********************************************************************************/
@@ -234,7 +241,18 @@ void udp_client_task(void *arg)
         print_heap_usage("After controlling the LED and ACKing the server\n");
     }
  }
-
+cy_ecm_phy_callbacks_t phy_callbacks =
+{
+        .phy_init = cy_eth_phy_init,
+        .phy_configure = cy_eth_phy_configure,
+        .phy_enable_ext_reg = cy_eth_phy_enable_ext_reg,
+        .phy_discover = cy_eth_phy_discover,
+        .phy_get_auto_neg_status = cy_eth_phy_get_auto_neg_status,
+        .phy_get_link_partner_cap = cy_eth_phy_get_link_partner_cap,
+        .phy_get_linkspeed = cy_eth_phy_get_linkspeed,
+        .phy_get_linkstatus = cy_eth_phy_get_linkstatus,
+        .phy_reset = cy_eth_phy_reset
+};
 /*******************************************************************************
  * Function Name: connect_to_ethernet
  *******************************************************************************
@@ -256,23 +274,7 @@ cy_rslt_t connect_to_ethernet(void)
     uint8_t retry_count = 0;
 
     /* Variables used by Ethernet connection manager.*/
-    cy_ecm_phy_config_t ecm_phy_config;
     cy_ecm_ip_address_t ip_addr;
-
-    #if ENABLE_STATIC_IP_ADDRESS
-    cy_ecm_ip_setting_t static_ip_addr;
-
-    static_ip_addr.ip_address.version = CY_ECM_IP_VER_V4;
-    static_ip_addr.ip_address.ip.v4 = UDP_STATIC_IP_ADDR;
-    static_ip_addr.gateway.version = CY_ECM_IP_VER_V4;
-    static_ip_addr.gateway.ip.v4 = UDP_STATIC_GATEWAY;
-    static_ip_addr.netmask.version = CY_ECM_IP_VER_V4;
-    static_ip_addr.netmask.ip.v4 = UDP_NETMASK;
-    #endif
-
-    ecm_phy_config.interface_speed_type = CY_ECM_SPEED_TYPE_RGMII;
-    ecm_phy_config.mode = CY_ECM_DUPLEX_AUTO;
-    ecm_phy_config.phy_speed = CY_ECM_PHY_SPEED_AUTO;
 
     /* Initialize ethernet connection manager. */
     result = cy_ecm_init();
@@ -286,10 +288,8 @@ cy_rslt_t connect_to_ethernet(void)
         printf("Ethernet connection manager initialized.\n");
     }
 
-    /* To change the MAC address,enter the desired MAC as the second parameter 
-    in cy_ecm_ethif_init() instead of NULL. Default MAC address(00-03-19-45-00-00) 
-    is used when NULL is passed. */
-    result =  cy_ecm_ethif_init(CY_ECM_INTERFACE_ETH1, NULL, &ecm_phy_config, &ecm_handle);
+    /* Initialize the Ethernet Interface and PHY driver */
+    result =  cy_ecm_ethif_init(INTERFACE_ID, &phy_callbacks, &ecm_handle);
     if (result != CY_RSLT_SUCCESS)
     {
         printf("Ethernet interface initialization failed! Error code: 0x%08"PRIx32"\n", (uint32_t)result);
@@ -299,13 +299,8 @@ cy_rslt_t connect_to_ethernet(void)
     /* Establish a connection to the ethernet network */
     while(1)
     {
-        #if ENABLE_STATIC_IP_ADDRESS
-        /* Connect to the ethernet network with the assigned static IP address */
-        result = cy_ecm_connect(ecm_handle, &static_ip_addr, &ip_addr);
-        #else
         /* Connect to the ethernet network with the dynamically allocated IP address by DHCP */
         result = cy_ecm_connect(ecm_handle, NULL, &ip_addr);
-        #endif
         if(result != CY_RSLT_SUCCESS)
         {
             retry_count++;
@@ -339,6 +334,7 @@ cy_rslt_t connect_to_ethernet(void)
 cy_rslt_t create_udp_client_socket(void)
 {
     cy_rslt_t result;
+    cy_socket_interface_t interface;
 
     /* Create a UDP socket. */
     result = cy_socket_create(CY_SOCKET_DOMAIN_AF_INET, CY_SOCKET_TYPE_DGRAM, CY_SOCKET_IPPROTO_UDP, &client_handle);
@@ -356,6 +352,21 @@ cy_rslt_t create_udp_client_socket(void)
     /* Register the callback function to handle messages received from UDP client. */
     result = cy_socket_setsockopt(client_handle, CY_SOCKET_SOL_SOCKET, CY_SOCKET_SO_RECEIVE_CALLBACK,
                                     &udp_recv_option, sizeof(cy_socket_opt_callback_t));
+
+    if(INTERFACE_ID == CY_ECM_INTERFACE_ETH0)
+    {
+        interface = CY_SOCKET_ETH0_INTERFACE;
+    }
+    else
+    {
+        interface = CY_SOCKET_ETH1_INTERFACE;
+    }
+    result = cy_socket_setsockopt(client_handle, CY_SOCKET_SOL_SOCKET, CY_SOCKET_SO_BINDTODEVICE,
+                                   (void*)(&interface), sizeof(interface));
+    if(result != CY_RSLT_SUCCESS)
+    {
+        printf("cy_socket_setsockopt failed: %u\n", (unsigned int)result);
+    }
 
     return result;
 }
